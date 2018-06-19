@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -17,25 +18,20 @@ import javax.swing.text.html.HTMLDocument.Iterator;
 import net.sp.init.mysql.DBUtil;
 import net.sp.init.mysql.mysqlInit;
 
-
-
-
 import com.mysql.jdbc.PreparedStatement;
+import com.tonetime.commons.database.DataSourceBuilder;
 import com.tonetime.commons.database.helper.DbHelper;
 import com.tonetime.commons.database.helper.JdbcCallback;
 
 import net.sp.init.wx.*;
+
+
 	public class initWx_sub_dev implements Runnable{
 		
 		
 		private int Count;//一次分页的个数
-		private Connection connM,connS ;
-		public initWx_sub_dev(int count) throws SQLException{
-			connM = new DBUtil().getMasterConnection();
-			connM.setAutoCommit(false); 
-			
-			connS = new DBUtil().getSlaveConnection();
 		
+		public initWx_sub_dev(int count) {
 			
 			this.Count=count;
 		}
@@ -48,11 +44,16 @@ import net.sp.init.wx.*;
 			 * 当副表最大值小于主表最大值时，则进行拷贝，完全拷贝
 			 */
 			
-			System.out.println(slaveMax+"\t"+MasterMax);
+			System.out.println(slaveMax+"==>"+MasterMax);
 			if(slaveMax>MasterMax){
+				//table has changed!
+				// do delete then insert all element
+				
 				if(deleteMaster()){
 					int count=0;
+					
 					while(count<slaveMax){
+						
 						try {
 							InsertTable(count, count+Count);
 							count+=Count;
@@ -67,19 +68,10 @@ import net.sp.init.wx.*;
 				System.out.println("wx_sub_dev no change!");
 			}
 			
-			
-			
-			
-			try {
-				connM.close();
-				connS.close();
-			} catch (SQLException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
 				
 		}
-		public static int SlaveMax(){//总数量
+		public static int SlaveMax(){
+			//the biggest n_id of SlaveSource
 			Map<String, Object> map=null;
 			try {
 				map=(Map<String, Object>) DbHelper.execute(mysqlInit.getInstance().getSlaveSource(), new JdbcCallback() {
@@ -106,7 +98,9 @@ import net.sp.init.wx.*;
 			
 		}
 		
-		public static int MasterMax(){//总数量
+		public static int MasterMax(){
+			//the biggest n_id of MasterSource
+			
 			Map<String, Object> map=null;
 			try {
 				map=(Map<String, Object>) DbHelper.execute(mysqlInit.getInstance().getMasterSource(), new JdbcCallback() {
@@ -132,25 +126,22 @@ import net.sp.init.wx.*;
 			
 		}
 		public boolean deleteMaster(){
-			String sql_Delete = "truncate  wx_sub_dev";  
+			final String sql_Delete = "truncate  wx_sub_dev";  
 			
-	        PreparedStatement jps=null;
 			try {
-				jps = (PreparedStatement) connM.prepareStatement(sql_Delete, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-			} catch (SQLException e) {
+				DbHelper.execute(mysqlInit.getInstance().getMasterSource(), new JdbcCallback() {
+					
+					@Override
+					public Object doInJdbc(Connection arg0) throws SQLException, Exception {
+						// TODO Auto-generated method stub
+						
+						
+						return DbHelper.executeUpdate(arg0,sql_Delete);
+					}
+				});
+			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-				System.err.println("删除语句有误");
-				return false;
-			}
-	            
-	        try {
-				ResultSet rs = jps.executeQuery();
-			} catch (SQLException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-				System.err.println("删除语句执行有误");
-				return false;
 			}
 	        return true;
 		}
@@ -161,61 +152,98 @@ import net.sp.init.wx.*;
 			/*copy iov_track_0 to iov_track_99
 			 * 
 			 */
-			String sql_Select="select * from wx_sub_dev  where n_id > "+ start+" and n_id <= "+end;
-			String sql_Insert = "INSERT INTO wx_sub_dev VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";  
+			
+			
+			/*
+			 * 1.select
+			 */
+			final String sql_Select="select * from wx_sub_dev  where n_id > "+ start+" and n_id <= "+end;
+			
 			
 	        
+	        List<Map<String,Object>> list=null;
+	        try {
+				list = (List<Map<String, Object>>) DbHelper.execute(mysqlInit.getInstance().getSlaveSource(),new JdbcCallback() {
+					
+					@Override
+					public Object doInJdbc(Connection arg0) throws SQLException, Exception {
+						// TODO Auto-generated method stub
+						return DbHelper.queryForList(arg0, sql_Select);
+					}
+				});
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 	        
-	        int i = 1;
+	        if(list==null||list.size()==0)return ;
+	       
+	        String sqlTemp="INSERT INTO wx_sub_dev(t_update_time,n_id,c_model,t_create_time,c_dev_name,c_open_id,c_photo,c_imei,c_illegal,c_sos,n_rate,c_video,c_app_code) VALUES ";
+	        int i=0;
+	        for(;i<list.size()-1;i++){
+	        	//第n-1个
+	        	Map<String,Object> map=list.get(i);
+	        	java.util.Iterator<String> it = map.keySet().iterator();
+	        	sqlTemp += "(";
+	        	while(it.hasNext()){
+	        		String key =it.next();
+	        		
+	        		String value;
+	        		value = map.get(key)!=null ?map.get(key).toString():null;
+	        		sqlTemp += "'" + value + "'";
+	        		if(it.hasNext()){
+	        			sqlTemp += ",";
+	        		}
+	        	}
+	        	sqlTemp += "),";
+	        }
+	        if(i != 0 ||list.size()==1){
+	        	//第n个
+	        	
+	        	Map<String,Object> map=list.get(i);
+	        	java.util.Iterator<String> it = map.keySet().iterator();
+	        	
+	        	sqlTemp += "(";
+	        	while(it.hasNext()){
+	        		String key =it.next();
+	        		
+	        		String value;
+	        		value = map.get(key)!=null ?map.get(key).toString():null;
+	        		sqlTemp  += "'" + value + "'";
+	        		if(it.hasNext()){
+	        			sqlTemp += ",";
+	        		}
+	        	}
+	        	sqlTemp += ")";
+	        }
+	       
+	        /*
+	         * 2.Insert
+	         */
 	        
-	        PreparedStatement jps = (PreparedStatement) connS.prepareStatement(sql_Select, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-	            
-	        ResultSet rs = jps.executeQuery();
-	        if (!rs.next()) return;
-	        PreparedStatement prs = (PreparedStatement) connM.prepareStatement(sql_Insert);
-	       
-	        do {
-	            	
-	            	   prs.setInt(1, rs.getInt(1));  
-	            	   
-		               prs.setString(2,rs.getString(2));  
-		               prs.setString(3,rs.getString(3));
-		               prs.setString(4,rs.getString(4));  
-		               prs.setString(5,rs.getString(5));
-		               prs.setString(6,rs.getString(6));  
-		               prs.setString(7,rs.getString(7));
-		               prs.setString(8,rs.getString(8));  
-		               prs.setString(9,rs.getString(9));
-		               prs.setString(10,rs.getString(10));  
-		              
-		               
-		               prs.setInt(11, rs.getInt(11)); 
-		               
-		               
-		               prs.setTimestamp(12, rs.getTimestamp(12));
-		               prs.setTimestamp(13, rs.getTimestamp(13));
-		               
-		              
-		              
-		               prs.addBatch();
-		              
-	               
-	                if (i++ % Count == 0) {
-	                	
-	                    prs.executeBatch();
-	                    prs.clearBatch();
-	                }
-	            } while (rs.next());
-	            prs.executeBatch();
-	            rs.close();
-	            
-	       
-	        connM.commit();
-	        connM.rollback(); 
+	        final String sql_Insert =sqlTemp; 
+	        
+	        System.out.println(sqlTemp);
+	        insert(sql_Insert);
+	        
 	        
 	    }
 			
-
+		public void insert(final String sql){
+			try {
+				DbHelper.execute(mysqlInit.getInstance().getMasterSource(),new JdbcCallback() {
+					
+					@Override
+					public Object doInJdbc(Connection arg0) throws SQLException, Exception {
+						// TODO Auto-generated method stub
+						return DbHelper.executeUpdate(arg0,sql);
+					}
+				});
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
 		
 		public static void main(String []args) throws Exception{
 			//initCopy.number(0);

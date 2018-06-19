@@ -18,6 +18,9 @@ import net.sp.init.mysql.mysqlInit;
 
 
 
+
+
+
 import com.mysql.jdbc.PreparedStatement;
 import com.tonetime.commons.database.helper.DbHelper;
 import com.tonetime.commons.database.helper.JdbcCallback;
@@ -25,50 +28,49 @@ import com.tonetime.commons.database.helper.JdbcCallback;
 import net.sp.init.wx.*;
 public class initCopy implements Runnable{
 	
-	private int index;//表的下表
 	private int Count;//一次分页的个数
-	private Connection connM,connS ;
-	public initCopy(int index,int count) throws SQLException{
-		connM = new DBUtil().getMasterConnection();
-		connM.setAutoCommit(false); 
-		
-		connS = new DBUtil().getSlaveConnection();
-	
+	private int index;
+	public initCopy(int index,int count) {
 		this.index=index;
 		this.Count=count;
 	}
 	
 	@Override
 	public void run(){
-		int sum=initCopy.number(index);
+		int slaveMax=SlaveMax();
+		int MasterMax=MasterMax();
+		/*副表若为空则返回-1
+		 * 当副表最大值小于主表最大值时，则进行拷贝，完全拷贝
+		 */
 		
-		System.out.println("总数为："+sum);
-		int count=0;
-		
-		try {
-			while(count<sum){
-				//System.out.println("次数");
-				getPage(count,count+Count);
+		System.out.println(slaveMax+"==>"+MasterMax);
+		if(slaveMax>MasterMax){
+			//table has changed!
+			// do delete then insert all element
+			
+			
+				int count=MasterMax;
 				
-				count+=Count;
-			}
-		} catch (SQLException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+				while(count<slaveMax){
+					
+					try {
+						InsertTable(count, count+Count);
+						count+=Count;
+					} catch (SQLException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
+			
 		}
-		//System.out.println(count);
-		
-		
-		try {
-			connM.close();
-			connS.close();
-		} catch (SQLException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		else{
+			System.out.println("iov_track_"+index+" no change!");
 		}
+		
 			
 	}
-	public static int number(final int num){//总数量
+	public  int SlaveMax(){
+		//the biggest n_id of SlaveSource
 		Map<String, Object> map=null;
 		try {
 			map=(Map<String, Object>) DbHelper.execute(mysqlInit.getInstance().getSlaveSource(), new JdbcCallback() {
@@ -76,7 +78,8 @@ public class initCopy implements Runnable{
 				@Override
 				public Object doInJdbc(Connection arg0) throws SQLException, Exception {
 					// TODO Auto-generated method stub
-					String sql="select n_id from iov_track_"+num+" order by n_id desc limit 1";
+					String sql="select n_id from iov_track_"+index+" order by n_id desc limit 1";
+					
 					return DbHelper.queryFor(arg0,sql);
 				}
 			});
@@ -85,6 +88,7 @@ public class initCopy implements Runnable{
 			e.printStackTrace();
 		}
 		 Number value =0;
+		 if(map==null)return 0;
 		 for (String key : map.keySet()) {
              value =  (Number)map.get(key);
              break;
@@ -93,75 +97,158 @@ public class initCopy implements Runnable{
 		
 	}
 	
-	
-	
-	public void getPage(final int start,final int end) throws SQLException{//分页查出数据元
+	public int MasterMax(){
+		//the biggest n_id of MasterSource
+		
+		Map<String, Object> map=null;
+		try {
+			map=(Map<String, Object>) DbHelper.execute(mysqlInit.getInstance().getMasterSource(), new JdbcCallback() {
+				
+				@Override
+				public Object doInJdbc(Connection arg0) throws SQLException, Exception {
+					// TODO Auto-generated method stub
+					String sql="select n_id from iov_track_"+index+" order by n_id desc limit 1";
+					return DbHelper.queryFor(arg0,sql);
+				}
+			});
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		 Number value =0;
+		 if(map==null)return 0;
+		 for (String key : map.keySet()) {
+             value =  (Number)map.get(key);
+             break;
+		 }
+		return (value.intValue());
+		
+	}
+	public boolean deleteMaster(){
+		final String sql_Delete = "truncate  iov_track_"+index;  
+		
+		try {
+			DbHelper.execute(mysqlInit.getInstance().getMasterSource(), new JdbcCallback() {
+				
+				@Override
+				public Object doInJdbc(Connection arg0) throws SQLException, Exception {
+					// TODO Auto-generated method stub
+					
+					
+					return DbHelper.executeUpdate(arg0,sql_Delete);
+				}
+			});
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        return true;
+	}
+	public void InsertTable(final int start,final int end) throws SQLException{//分页查出数据元
 		
 		
 		
 		/*copy iov_track_0 to iov_track_99
 		 * 
 		 */
-		String sql_Select="select * from iov_track_"+index+"  where n_id > "+ start+" and n_id <= "+end;
-		String sql_Insert = "INSERT INTO iov_track_"+index+" VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)";  
+		
+		
+		/*
+		 * 1.select
+		 */
+		
+		final String sql_Select="select * from iov_track_"+index+"  where n_id > "+ start+" and n_id <= "+end;
+		
 		
         
+        List<Map<String,Object>> list=null;
+        try {
+			list = (List<Map<String, Object>>) DbHelper.execute(mysqlInit.getInstance().getSlaveSource(),new JdbcCallback() {
+				
+				@Override
+				public Object doInJdbc(Connection arg0) throws SQLException, Exception {
+					// TODO Auto-generated method stub
+					return DbHelper.queryForList(arg0, sql_Select);
+				}
+			});
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
         
-        int i = 1;
-        
-            PreparedStatement jps = (PreparedStatement) connS.prepareStatement(sql_Select, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-            
-            ResultSet rs = jps.executeQuery();
-            if (!rs.next()) return;
-            PreparedStatement prs = (PreparedStatement) connM.prepareStatement(sql_Insert);
-            do {
-            	//System.out.println(rs.getInt(1));
-            	   prs.setInt(1, rs.getInt(1));  
-	               prs.setString(2,rs.getString(2));  
-	               prs.setString(3,rs.getString(3));
-	                
-	               prs.setInt(4, rs.getInt(4)); 
-	               prs.setDouble(5, rs.getDouble(5));
-	               prs.setDouble(6,rs.getDouble(6));
-	                
-	                
-	               prs.setInt(7, rs.getInt(7));  
-	               prs.setDouble(8, rs.getDouble(8));
-	               prs.setDouble(9, rs.getDouble(9));
-	               prs.setInt(10, rs.getInt(10));  
-	               prs.setDouble(11, rs.getDouble(11));
-	                
-	               prs.setFloat(12, rs.getFloat(12));
-	               prs.setFloat(13, rs.getFloat(13));
-	               prs.setDouble(14, rs.getDouble(14));
-	               prs.setDouble(15, rs.getDouble(15));
-	               prs.setDouble(16, rs.getDouble(16));
-	               prs.setDouble(17, rs.getDouble(17));
-	                
-	               prs.setString(18,rs.getString(18));
-	               prs.setTimestamp(19, rs.getTimestamp(19));
-	               prs.setTimestamp(20, rs.getTimestamp(20));
-	                
-	               prs.addBatch();
-                
-               
-                if (i++ % Count == 0) {
-                	
-                    prs.executeBatch();
-                    prs.clearBatch();
-                }
-            } while (rs.next());
-            prs.executeBatch();
-            rs.close();
-            
+        if(list==null||list.size()==0)return ;
        
-        connM.commit();
-        connM.rollback(); 
+        String sqlTemp="INSERT INTO iov_track_"+index+"(n_id,t_data_time,n_distance,t_create_time,n_bearing,n_accuracy,n_lng,n_lat,n_speed_2,n_gpstime,c_token,n_speed,n_clng,c_model,n_effect,n_type,n_clat,n_altitude,c_imei,n_satellite) "
+        		+ "VALUES ";
+        int i=0;
+        for(;i<list.size()-1;i++){
+        	//第n-1个
+        	Map<String,Object> map=list.get(i);
+        	java.util.Iterator<String> it = map.keySet().iterator();
+        	sqlTemp += "(";
+        	while(it.hasNext()){
+        		String key =it.next();
+        		
+        		String value;
+        		value = map.get(key)!=null ?map.get(key).toString():"null";
+        		if(map.get(key)!=null)sqlTemp  += "'" + value + "'";
+        		else sqlTemp  +=  value;
+        		if(it.hasNext()){
+        			sqlTemp += ",";
+        		}
+        	}
+        	
+        	sqlTemp += "),";
+        }
+        if(i != 0 ||list.size()==1){
+        	//第n个
+        	
+        	Map<String,Object> map=list.get(i);
+        	java.util.Iterator<String> it = map.keySet().iterator();
+        	
+        	sqlTemp += "(";
+        	while(it.hasNext()){
+        		String key =it.next();
+        		
+        		String value;
+        		value = map.get(key)!=null ?map.get(key).toString():"null";
+        		if(map.get(key)!=null)sqlTemp  += "'" + value + "'";
+        		else sqlTemp  +=  value;
+        		if(it.hasNext()){
+        			sqlTemp += ",";
+        		}
+        	}
+        	sqlTemp += ")";
+        }
+       
+        /*
+         * 2.Insert
+         */
+        
+        final String sql_Insert =sqlTemp; 
+        
+        //System.out.println(sqlTemp);
+        insert(sql_Insert);
+        
         
     }
 		
+	public void insert(final String sql){
+		try {
+			DbHelper.execute(mysqlInit.getInstance().getMasterSource(),new JdbcCallback() {
+				
+				@Override
+				public Object doInJdbc(Connection arg0) throws SQLException, Exception {
+					// TODO Auto-generated method stub
+					return DbHelper.executeUpdate(arg0,sql);
+				}
+			});
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 
-	
 	public static void main(String []args) throws Exception{
 		//initCopy.number(0);
 		System.out.println("start!");
@@ -169,11 +256,11 @@ public class initCopy implements Runnable{
 		
 		ExecutorService exec=Executors.newFixedThreadPool(102);
 		//while(true){
-		for(int i=0;i<100;i++){
+		for(int i=0;i<1;i++){
 			exec.execute(new initCopy(i,1000));
+			
 		}
-//		exec.execute(new initWx_sub_dev(1000));
-//		exec.execute(new initWx_subscriber(1000));
+		
 		//System.out.println(start1-start);
 		 
         exec.shutdown();
