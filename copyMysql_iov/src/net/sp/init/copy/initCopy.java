@@ -21,6 +21,9 @@ import net.sp.init.mysql.mysqlInit;
 
 
 
+
+
+
 import com.mysql.jdbc.PreparedStatement;
 import com.tonetime.commons.database.helper.DbHelper;
 import com.tonetime.commons.database.helper.JdbcCallback;
@@ -28,11 +31,13 @@ import com.tonetime.commons.database.helper.JdbcCallback;
 import net.sp.init.wx.*;
 public class initCopy implements Runnable{
 	
-	private int Count;//一次分页的个数
+	private int insert;//一次分页的个数
 	private int index;
-	public initCopy(int index,int count) {
+	private int select;
+	public initCopy(int index,int select,int insert) {
 		this.index=index;
-		this.Count=count;
+		this.select=select;
+		this.insert=insert;
 	}
 	
 	@Override
@@ -42,20 +47,20 @@ public class initCopy implements Runnable{
 		/*副表若为空则返回-1
 		 * 当副表最大值小于主表最大值时，则进行拷贝，完全拷贝
 		 */
-		
+		//slaveMax=100000;
 		System.out.println(slaveMax+"==>"+MasterMax);
 		if(slaveMax>MasterMax){
 			//table has changed!
 			// do delete then insert all element
 			
-			
+				
 				int count=MasterMax;
 				
 				while(count<slaveMax){
 					
 					try {
-						InsertTable(count, count+Count);
-						count+=Count;
+						InsertTable(count, count+select);
+						count+=select;
 					} catch (SQLException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
@@ -145,13 +150,10 @@ public class initCopy implements Runnable{
         return true;
 	}
 	public void InsertTable(final int start,final int end) throws SQLException{//分页查出数据元
-		
-		
-		
-		/*copy iov_track_0 to iov_track_99
-		 * 
+		long start1 = System.currentTimeMillis();
+		/*
+		 *COPY 0~99 
 		 */
-		
 		
 		/*
 		 * 1.select
@@ -161,13 +163,14 @@ public class initCopy implements Runnable{
 		
 		
         
-        List<Map<String,Object>> list=null;
+       List<Map<String,Object>> list = null;
         try {
 			list = (List<Map<String, Object>>) DbHelper.execute(mysqlInit.getInstance().getSlaveSource(),new JdbcCallback() {
 				
 				@Override
 				public Object doInJdbc(Connection arg0) throws SQLException, Exception {
 					// TODO Auto-generated method stub
+					
 					return DbHelper.queryForList(arg0, sql_Select);
 				}
 			});
@@ -175,64 +178,95 @@ public class initCopy implements Runnable{
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-        
+        //System.out.println(list);
+//        if(true)return;
         if(list==null||list.size()==0)return ;
-       
-        String sqlTemp="INSERT INTO iov_track_"+index+"(n_id,t_data_time,n_distance,t_create_time,n_bearing,n_accuracy,n_lng,n_lat,n_speed_2,n_gpstime,c_token,n_speed,n_clng,c_model,n_effect,n_type,n_clat,n_altitude,c_imei,n_satellite) "
-        		+ "VALUES ";
-        int i=0;
-        for(;i<list.size()-1;i++){
+        int i;
+
+
+        
+       /*
+        * 2.insert :DbHelper.executeUpdate(connection,String sql) 
+        */
+        
+        
+        
+        i=0;
+        int n = list.size();
+        for(;i<n;i+=insert){
         	//第n-1个
-        	Map<String,Object> map=list.get(i);
-        	java.util.Iterator<String> it = map.keySet().iterator();
-        	sqlTemp += "(";
-        	while(it.hasNext()){
-        		String key =it.next();
-        		
-        		String value;
-        		value = map.get(key)!=null ?map.get(key).toString():"null";
-        		if(map.get(key)!=null)sqlTemp  += "'" + value + "'";
-        		else sqlTemp  +=  value;
-        		if(it.hasNext()){
-        			sqlTemp += ",";
-        		}
+        	int count = i+insert;
+        	
+        	String sql = "";
+        	if(count <= n){
+        		sql = combineSql(list,i,count);
         	}
         	
-        	sqlTemp += "),";
-        }
-        if(i != 0 ||list.size()==1){
-        	//第n个
-        	
-        	Map<String,Object> map=list.get(i);
-        	java.util.Iterator<String> it = map.keySet().iterator();
-        	
-        	sqlTemp += "(";
-        	while(it.hasNext()){
-        		String key =it.next();
-        		
-        		String value;
-        		value = map.get(key)!=null ?map.get(key).toString():"null";
-        		if(map.get(key)!=null)sqlTemp  += "'" + value + "'";
-        		else sqlTemp  +=  value;
-        		if(it.hasNext()){
-        			sqlTemp += ",";
-        		}
+        	else if(count > n){
+        		sql = combineSql(list,i,n);
         	}
-        	sqlTemp += ")";
+        	
+        
+        	final String insertSql=sql;
+        	
+        	insert(insertSql);
         }
-       
-        /*
-         * 2.Insert
-         */
-        
-        final String sql_Insert =sqlTemp; 
-        
-        //System.out.println(sqlTemp);
-        insert(sql_Insert);
-        
         
     }
-		
+	 public String combineSql(List<Map<String,Object>> list,int start,int end){
+		 String sqlTemp="INSERT INTO iov_track_"+index+"(n_id,t_data_time,n_distance,t_create_time,n_bearing,n_accuracy,n_lng,n_lat,n_speed_2,n_gpstime,c_token,n_speed,n_clng,c_model,n_effect,n_type,n_clat,n_altitude,c_imei,n_satellite) "
+	        		+ "VALUES ";
+		 int i = start;
+		 for(;i<end-1;i++){
+			 
+			 final Map<String,Object>	map=list.get(i);
+			 java.util.Iterator<String> it = map.keySet().iterator();
+			 sqlTemp += "(";
+			 while(it.hasNext()){
+				String key =it.next();
+     		
+	     		String value;
+	     		value = map.get(key)!=null ?map.get(key).toString():"null";
+	     		if(map.get(key)!=null)sqlTemp  += "'" + value + "'";
+	     		else sqlTemp  +=  value;
+	     		if(it.hasNext()){
+	     			sqlTemp += ",";
+	     		}
+	     	 }
+     	
+			 sqlTemp += "),";
+		 }
+		 if(i != 0 || (end-start )==1){
+     	//第n个
+	     	
+	     	final Map<String,Object> map=list.get(i);
+	     	java.util.Iterator<String> it = map.keySet().iterator();
+	     	
+	     	sqlTemp += "(";
+	     	while(it.hasNext()){
+	     		String key =it.next();
+	     		
+	     		String value;
+	     		value = map.get(key)!=null ?map.get(key).toString():"null";
+	     		if(map.get(key)!=null)sqlTemp  += "'" + value + "'";
+	     		else sqlTemp  +=  value;
+	     		if(it.hasNext()){
+	     			sqlTemp += ",";
+	     		}
+	     	}
+	     	sqlTemp += ")";
+	     }
+    
+     /*
+      * 2.Insert
+      */
+     
+	     final String sql_Insert =sqlTemp; 
+	     
+	     return sql_Insert;
+		 
+	 	
+	}
 	public void insert(final String sql){
 		try {
 			DbHelper.execute(mysqlInit.getInstance().getMasterSource(),new JdbcCallback() {
@@ -249,6 +283,10 @@ public class initCopy implements Runnable{
 		}
 	}
 
+
+	
+	
+
 	public static void main(String []args) throws Exception{
 		//initCopy.number(0);
 		System.out.println("start!");
@@ -256,8 +294,8 @@ public class initCopy implements Runnable{
 		
 		ExecutorService exec=Executors.newFixedThreadPool(102);
 		//while(true){
-		for(int i=0;i<1;i++){
-			exec.execute(new initCopy(i,1000));
+		for(int i=2;i<3;i++){
+			exec.execute(new initCopy(i,1000,100));
 			
 		}
 		
@@ -271,7 +309,6 @@ public class initCopy implements Runnable{
                  //System.out.println("Finally do something ");
                  long end = System.currentTimeMillis();
                  System.out.println("用时: " + (end - start) + "ms");
-                 
                  
                  break;
              }

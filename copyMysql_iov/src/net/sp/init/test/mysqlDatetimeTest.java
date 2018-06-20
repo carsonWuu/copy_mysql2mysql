@@ -14,39 +14,34 @@ import com.tonetime.commons.database.helper.JdbcCallback;
 
 public class mysqlDatetimeTest {
 	public static void main(String [] args){
-		try{
-			String s="insert into test values(4,";
-			String q="null";
-			final String sql=s+q+")";
-			DbHelper.execute(mysqlInit.getInstance().getMasterSource(),new JdbcCallback() {
+		long start = System.currentTimeMillis();
+		int max=1000000;
+		
+		int once=30000;
+		for(int i=0;i<max;i+=once){
+			try{
 				
-				@Override
-				public Object doInJdbc(Connection arg0) throws SQLException, Exception {
-					// TODO Auto-generated method stub
-					return DbHelper.executeUpdate(arg0,sql);
-				}
-			});
-		}
-		catch(Exception e){
-			
-		}
-		finally{
-			final String sql="select *from test";
-			Object obj=null;
-			try {
-				obj = DbHelper.execute(mysqlInit.getInstance().getMasterSource(),new JdbcCallback() {
+				
+				
+				final String sql="select * from iov_track_0 where n_id > 0 and n_id < "+once;
+				//System.out.println(sql);
+				DbHelper.execute(mysqlInit.getInstance().getMasterSource(),new JdbcCallback() {
 					
 					@Override
 					public Object doInJdbc(Connection arg0) throws SQLException, Exception {
 						// TODO Auto-generated method stub
-						return DbHelper.queryForValue(arg0,sql);
+						return DbHelper.executeUpdate(arg0,sql);
 					}
 				});
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
 			}
-			System.out.println(obj);
+			catch(Exception e){
+				
+			}
 		}
+		
+		long end = System.currentTimeMillis();
+		
+		System.out.println((end-start)+"ms");
+		
 	}
 }
