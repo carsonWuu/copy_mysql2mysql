@@ -13,7 +13,9 @@ import java.util.concurrent.Executors;
 
 import javax.swing.text.html.HTMLDocument.Iterator;
 
-import net.sp.init.mysql.DBUtil;
+
+
+
 import net.sp.init.mysql.mysqlInit;
 
 import com.tonetime.commons.database.DataSourceBuilder;
@@ -37,7 +39,7 @@ import net.sp.init.wx.*;
 		public void run(){
 			int slaveMax=SlaveMax();
 			int MasterMax=MasterMax();
-			/*副表若为空则返回-1
+			/*副表若为空则返回0
 			 * 当副表最大值小于主表最大值时，则进行拷贝，完全拷贝
 			 */
 			
@@ -86,7 +88,7 @@ import net.sp.init.wx.*;
 				e.printStackTrace();
 			}
 			 Number value =0;
-			 if(map==null)return -1;
+			 if(map==null)return 0;
 			 for (String key : map.keySet()) {
 	             value =  (Number)map.get(key);
 	             break;
@@ -114,7 +116,7 @@ import net.sp.init.wx.*;
 				e.printStackTrace();
 			}
 			 Number value =0;
-			 if(map==null)return -1;
+			 if(map==null)return 0;
 			 for (String key : map.keySet()) {
 	             value =  (Number)map.get(key);
 	             break;
@@ -168,74 +170,298 @@ import net.sp.init.wx.*;
 						return DbHelper.queryForList(arg0, sql_Select);
 					}
 				});
-			} catch (Exception e) {
+			}
+	        catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 	        
-	        if(list==null||list.size()==0)return ;
-	       
-	        String sqlTemp="INSERT INTO wx_subscriber("
-	        		+ "t_update_time,n_id,n_is_sub,t_create_time,n_precision,n_sex,n_lat,n_lng,c_country,c_open_id,c_city,c_province,c_union_id,t_unsub_time,"
-	        		+ "c_lac_label,c_app_code,c_avatar,c_wx_nickname,c_mobile,t_sub_time,c_wx_num) "
-	        		+ "VALUES ";
-	        int i=0;
-	        for(;i<list.size()-1;i++){
-	        	//第n-1个
-	        	Map<String,Object> map=list.get(i);
-	        	java.util.Iterator<String> it = map.keySet().iterator();
-	        	sqlTemp += "(";
-	        	while(it.hasNext()){
-	        		String key =it.next();
-	        		
-	        		String value;
-	        		value = map.get(key)!=null ?map.get(key).toString():"null";
-	        		if(map.get(key)!=null)
-	        			sqlTemp  += "'" + value + "'";
-	        		
-	        		else 
-	        			sqlTemp +=  value ;
-	        		
-	        		if(it.hasNext()){
-	        			sqlTemp += ",";
-	        		}
-	        	}
-	        	
-	        	sqlTemp += "),";
+	        if(list==null||list.size()==0){
+	        	return ;
 	        }
-	        if(i != 0 ||list.size()==1){
-	        	//第n个
-	        	
-	        	Map<String,Object> map=list.get(i);
-	        	java.util.Iterator<String> it = map.keySet().iterator();
-	        	
-	        	sqlTemp += "(";
-	        	while(it.hasNext()){
-	        		String key =it.next();
-	        		
-	        		String value;
-	        		
-	        		value = map.get(key)!=null ?map.get(key).toString():"null";
-	        		if(map.get(key)!=null)
-	        			sqlTemp  += "'" + value + "'";
-	        		else 
-	        			sqlTemp  +=  value;
-	        		
-	        		if(it.hasNext()){
-	        			sqlTemp += ",";
-	        		}
-	        	}
-	        	sqlTemp += ")";
-	        }
-	      
-	        /*
-	         * 2.Insert
-	         */
-	        
-	        final String sql_Insert =sqlTemp; 
-	        
 	       
-	        insert(sql_Insert);
+	        StringBuffer sqlTemp=new StringBuffer("INSERT INTO wx_subscriber VALUES");
+	       
+	        for(int i = 0 ;i<list.size();i++){
+				
+				final Map<String,Object>	map=list.get(i);
+				 
+				sqlTemp.append("(");
+				 
+				
+	     		
+		     	String value;
+		     	/*
+		     	 * n_id
+		     	 */
+		     	value = null!= map.get("n_id") ?map.get("n_id").toString():null;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append(value);
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+		     	
+		     	value = null!=  map.get("c_app_code") ?map.get("c_app_code").toString():null;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append(value);
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+		     	
+		     	value = null!=  map.get("c_open_id") ?map.get("c_open_id").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+		     	
+		     	
+		     	
+		     	value = null!=  map.get("c_union_id") ?map.get("c_union_id").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+
+		     	value = null!=  map.get("c_wx_num") ?map.get("c_wx_num").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+
+		     	value = null!=  map.get("c_wx_nickname") ?map.get("c_wx_nickname").toString(): null ;
+		     	if( null != value){
+		     		
+		     		if(value.contains("'"))value=value.replace("'", "\\\'");
+		     		System.out.println(value);
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+
+		     	value = null!=  map.get("c_mobile") ?map.get("c_mobile").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+
+		     	
+
+		     	value = null!=  map.get("n_sex") ?map.get("n_sex").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+
+		     	value = null!=  map.get("c_city") ?map.get("c_city").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+
+		     	value = null!=  map.get("c_avatar") ?map.get("c_avatar").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+
+		     	value = null!=  map.get("c_country") ?map.get("c_country").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+
+		     	value = null!=  map.get("c_province") ?map.get("c_province").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+
+		     	value = null!=  map.get("t_sub_time") ?map.get("t_sub_time").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+
+		     	value = null!=  map.get("n_is_sub") ?map.get("n_is_sub").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+		     	
+		     	value = null!=  map.get("n_lng") ?map.get("n_lng").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+
+		     	value = null!=  map.get("n_lat") ?map.get("n_lat").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+		     	value = null!=  map.get("n_precision") ?map.get("n_precision").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+
+		     	value = null!=  map.get("c_lac_label") ?map.get("c_lac_label").toString(): null ;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+
+		     	value = null!=  map.get("t_unsub_time") ?map.get("t_unsub_time").toString():null;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+		     	
+		     	value = null!=  map.get("t_update_time") ?map.get("t_update_time").toString():null;
+		     	if( null != value){
+		     		sqlTemp.append("'");
+		     		sqlTemp.append( value );
+		     		sqlTemp.append("' ,");
+		     	}
+		     	else {
+		     		sqlTemp.append(value);
+		     		sqlTemp.append(",");
+		     	}
+		     	
+		     	value = null!= map.get("t_create_time") ?map.get("t_create_time").toString(): null ;
+		     	
+		     	if(i != (list.size()-1) ){
+		     	
+			     	if( null != value){
+			     		sqlTemp.append("'");
+			     		sqlTemp.append( value );
+			     		sqlTemp.append("' ),");
+			     	}
+			     	else {
+			     		sqlTemp.append(value);
+			     		sqlTemp.append("),");
+			     	}
+		     	}
+		     	else {
+		     		if( null != value){
+			     		sqlTemp.append("'");
+			     		sqlTemp.append( value );
+			     		sqlTemp.append("' )");
+			     	}
+			     	else {
+			     		sqlTemp.append(value);
+			     		sqlTemp.append(")");
+			     	}
+		     	}
+				 
+			 }
+			
+	    
+	     /*
+	      * 2.Insert
+	      */
+	     
+		     final String sql_Insert =sqlTemp.toString(); 
+		     long end1 =System.currentTimeMillis();
+		     
+		     //System.out.println("time:"+(end1-start1));
+		     
+		     insert(sql_Insert);
+			 
+		 	
+		
 	        
 	        
 	    }

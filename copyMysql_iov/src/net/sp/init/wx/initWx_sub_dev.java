@@ -15,7 +15,7 @@ import java.util.concurrent.Executors;
 
 import javax.swing.text.html.HTMLDocument.Iterator;
 
-import net.sp.init.mysql.DBUtil;
+
 import net.sp.init.mysql.mysqlInit;
 
 import com.mysql.jdbc.PreparedStatement;
@@ -89,7 +89,7 @@ import net.sp.init.wx.*;
 				e.printStackTrace();
 			}
 			 Number value =0;
-			 if(map==null)return -1;
+			 if(map==null)return 0;
 			 for (String key : map.keySet()) {
 	             value =  (Number)map.get(key);
 	             break;
@@ -117,7 +117,7 @@ import net.sp.init.wx.*;
 				e.printStackTrace();
 			}
 			 Number value =0;
-			 if(map==null)return -1;
+			 if(map==null)return 0;
 			 for (String key : map.keySet()) {
 	             value =  (Number)map.get(key);
 	             break;
@@ -178,24 +178,26 @@ import net.sp.init.wx.*;
 	        
 	        if(list==null||list.size()==0)return ;
 	       
-	        String sqlTemp="INSERT INTO wx_sub_dev(t_update_time,n_id,c_model,t_create_time,c_dev_name,c_open_id,c_photo,c_imei,c_illegal,c_sos,n_rate,c_video,c_app_code) VALUES ";
+	        StringBuffer sqlTemp= new StringBuffer("INSERT INTO wx_sub_dev(t_update_time,n_id,c_model,t_create_time,c_dev_name,c_open_id,c_photo,c_imei,c_illegal,c_sos,n_rate,c_video,c_app_code) VALUES ");
 	        int i=0;
 	        for(;i<list.size()-1;i++){
 	        	//第n-1个
 	        	Map<String,Object> map=list.get(i);
 	        	java.util.Iterator<String> it = map.keySet().iterator();
-	        	sqlTemp += "(";
+	        	sqlTemp.append("(");
 	        	while(it.hasNext()){
 	        		String key =it.next();
 	        		
 	        		String value;
 	        		value = map.get(key)!=null ?map.get(key).toString():null;
-	        		sqlTemp += "'" + value + "'";
+	        		sqlTemp.append("'");
+	        		sqlTemp.append(value );
+	        		sqlTemp.append("'");
 	        		if(it.hasNext()){
-	        			sqlTemp += ",";
+	        			sqlTemp.append(",");
 	        		}
 	        	}
-	        	sqlTemp += "),";
+	        	sqlTemp.append("),");
 	        }
 	        if(i != 0 ||list.size()==1){
 	        	//第n个
@@ -203,27 +205,29 @@ import net.sp.init.wx.*;
 	        	Map<String,Object> map=list.get(i);
 	        	java.util.Iterator<String> it = map.keySet().iterator();
 	        	
-	        	sqlTemp += "(";
+	        	sqlTemp.append("(");
 	        	while(it.hasNext()){
 	        		String key =it.next();
 	        		
 	        		String value;
-	        		value = map.get(key)!=null ?map.get(key).toString():null;
-	        		sqlTemp  += "'" + value + "'";
+	        		value = null != map.get(key) ?map.get(key).toString():null;
+	        		sqlTemp.append("'");
+	        		sqlTemp.append(value );
+	        		sqlTemp.append("'");
 	        		if(it.hasNext()){
-	        			sqlTemp += ",";
+	        			sqlTemp.append(",");
 	        		}
 	        	}
-	        	sqlTemp += ")";
+	        	sqlTemp.append(")");
 	        }
 	       
 	        /*
 	         * 2.Insert
 	         */
 	        
-	        final String sql_Insert =sqlTemp; 
+	        final String sql_Insert =sqlTemp.toString(); 
 	        
-	        System.out.println(sqlTemp);
+	        
 	        insert(sql_Insert);
 	        
 	        
@@ -253,8 +257,8 @@ import net.sp.init.wx.*;
 			ExecutorService exec=Executors.newFixedThreadPool(102);
 			//while(true){
 			
-			exec.execute(new initWx_sub_dev(1000));
-			//exec.execute(new initWx_subscriber(1000));
+			exec.execute(new initWx_sub_dev(10000));
+			//exec.execute(new initWx_subscriber(10000));
 			//System.out.println(start1-start);
 			 
 	        exec.shutdown();
